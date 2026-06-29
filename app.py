@@ -69,27 +69,27 @@ else:
     except ImportError:
         serial = None
 
-# Color Palette (Catppuccin Mocha-inspired premium dark theme)
-BG_MAIN = "#181825"        # Base background
-BG_CARD = "#1e1e2e"        # Surface
-BG_INPUT = "#313244"       # Input field
-FG_MAIN = "#cdd6f4"        # Text
-FG_MUTED = "#a6adc8"       # Labels / Subtext
-ACCENT = "#89b4fa"         # Sky/Lavender blue
-ACCENT_HOVER = "#b4befe"   # Lighter sky blue
-ACCENT_GREEN = "#a6e3a1"   # Success green
-ACCENT_YELLOW = "#f9e2af"  # Warning yellow
-ACCENT_RED = "#f38ba8"     # Error red
-BG_BUTTON = "#89b4fa"
-FG_BUTTON = "#11111b"
-BG_BUTTON_DISABLED = "#313244"
-FG_BUTTON_DISABLED = "#7f849c"
+# Color Palette (Premium Slate Light Theme)
+BG_MAIN = "#f1f5f9"           # Slate-100 base background
+BG_CARD = "#ffffff"           # White cards/panels
+BG_INPUT = "#f8fafc"          # Slate-50 inputs
+FG_MAIN = "#0f172a"           # Slate-900 primary text
+FG_MUTED = "#64748b"          # Slate-500 muted text/labels
+ACCENT = "#2563eb"            # vibrant Blue-600
+ACCENT_HOVER = "#1d4ed8"      # Blue-700 hover
+ACCENT_GREEN = "#10b981"      # Emerald-500 success
+ACCENT_YELLOW = "#f59e0b"     # Amber-500 warn
+ACCENT_RED = "#ef4444"        # Red-500 error
+BG_BUTTON = "#e2e8f0"         # Slate-200 secondary button bg
+FG_BUTTON = "#0f172a"         # Slate-900 text on buttons
+BG_BUTTON_DISABLED = "#cbd5e1"
+FG_BUTTON_DISABLED = "#94a3b8"
 
 class ArkFlasherGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Ark Flasher (esptool wrapper)")
-        self.root.geometry("1180x820")
+        self.root.geometry("1120x730")
         self.root.configure(bg=BG_MAIN)
         self.root.resizable(True, True)
 
@@ -107,10 +107,21 @@ class ArkFlasherGUI:
         self.github_token_var = tk.StringVar(value=os.environ.get("GITHUB_TOKEN", ""))
 
         # Configure fonts
-        self.font_sans = ("Helvetica Neue", 11)
-        self.font_sans_bold = ("Helvetica Neue", 11, "bold")
-        self.font_title = ("Helvetica Neue", 12, "bold")
-        self.font_mono = ("Menlo", 10)
+        self.font_sans = ("Avenir Next", 10)
+        self.font_sans_bold = ("Avenir Next", 10, "bold")
+        self.font_title = ("Avenir Next", 11, "bold")
+        self.font_mono = ("Menlo", 9)
+
+        # Load and scale brand Logo
+        self.logo_img = None
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(script_dir, "img", "Logo.png")
+        if os.path.exists(logo_path):
+            try:
+                temp_img = tk.PhotoImage(file=logo_path)
+                self.logo_img = temp_img.subsample(3, 3)
+            except Exception as e:
+                print(f"Error loading logo: {e}")
 
         # Configure styles
         self.setup_styles()
@@ -156,8 +167,136 @@ class ArkFlasherGUI:
                   background=[("active", BG_CARD)], 
                   foreground=[("active", FG_MAIN)])
 
+    def add_hover_effect(self, widget, hover_bg, normal_bg, active_fg=None, normal_fg=None):
+        def on_enter(e):
+            if widget.cget("state") != "disabled":
+                widget.config(bg=hover_bg)
+                if active_fg:
+                    widget.config(fg=active_fg)
+        def on_leave(e):
+            if widget.cget("state") != "disabled":
+                widget.config(bg=normal_bg)
+                if normal_fg:
+                    widget.config(fg=normal_fg)
+        widget.bind("<Enter>", on_enter)
+        widget.bind("<Leave>", on_leave)
+
+    def update_hardware_status(self):
+        selected_port = self.selected_port_var.get()
+        if selected_port and selected_port != "No COM ports detected":
+            self.status_dot.configure(fg=ACCENT_GREEN)
+            self.status_text_lbl.configure(text=f"CONNECTED: {selected_port}", fg=FG_MAIN)
+        else:
+            self.status_dot.configure(fg=ACCENT_RED)
+            self.status_text_lbl.configure(text="DISCONNECTED", fg=FG_MUTED)
+
+    def render_board_catalog(self, boards):
+        # Clear existing cards in catalog
+        for widget in self.catalog_grid_frame.winfo_children():
+            widget.destroy()
+        self.board_card_widgets = []
+
+        if not boards:
+            no_boards_lbl = tk.Label(self.catalog_grid_frame, text="No board configurations discovered yet. Load a project first.", 
+                                     font=self.font_sans, bg=BG_CARD, fg=FG_MUTED)
+            no_boards_lbl.pack(pady=40)
+            return
+
+        # Render board cards
+        for board_name in boards:
+            card_frame = tk.Frame(self.catalog_grid_frame, bg=BG_CARD, bd=1, relief="solid", 
+                                  highlightbackground="#e2e8f0", highlightthickness=1, cursor="hand2")
+            card_frame.pack(side=tk.LEFT, padx=12, pady=10, ipady=12, ipadx=18)
+
+            lbl_title = tk.Label(card_frame, text=board_name.upper(), font=("Helvetica Neue", 13, "bold"), 
+                                 bg=BG_CARD, fg=ACCENT)
+            lbl_title.pack(anchor=tk.W, pady=(0, 4))
+
+            lbl_desc = tk.Label(card_frame, text="ESP32 Firmware Target", font=self.font_sans, 
+                                bg=BG_CARD, fg=FG_MUTED)
+            lbl_desc.pack(anchor=tk.W)
+
+            card_frame.board_name = board_name
+
+            def make_select_callback(name=board_name):
+                return lambda e: self.select_board_card(name)
+
+            card_frame.bind("<Button-1>", make_select_callback())
+            lbl_title.bind("<Button-1>", make_select_callback())
+            lbl_desc.bind("<Button-1>", make_select_callback())
+
+            def make_hover_enter(frame=card_frame):
+                def handler(e):
+                    if self.selected_board_var.get() != frame.board_name:
+                        frame.config(bg="#f1f5f9")
+                        for child in frame.winfo_children():
+                            child.config(bg="#f1f5f9")
+                return handler
+
+            def make_hover_leave(frame=card_frame):
+                def handler(e):
+                    if self.selected_board_var.get() != frame.board_name:
+                        frame.config(bg=BG_CARD)
+                        for child in frame.winfo_children():
+                            child.config(bg=BG_CARD)
+                return handler
+
+            card_frame.bind("<Enter>", make_hover_enter())
+            card_frame.bind("<Leave>", make_hover_leave())
+
+            self.board_card_widgets.append(card_frame)
+
+    def select_board_card(self, board_name):
+        self.selected_board_var.set(board_name)
+        self.combo_board.set(board_name)
+
+        # Highlight selected card, unhighlight others
+        for card in self.board_card_widgets:
+            if card.board_name == board_name:
+                card.config(highlightbackground=ACCENT, highlightthickness=1, bg="#eff6ff")
+                for child in card.winfo_children():
+                    child.config(bg="#eff6ff")
+            else:
+                card.config(highlightbackground="#e2e8f0", highlightthickness=1, bg=BG_CARD)
+                for child in card.winfo_children():
+                    child.config(bg=BG_CARD)
+
+        # Trigger partition parsing
+        self.on_board_selected()
+
     def build_ui(self):
-        # Main outer frame with padding
+        # --- TOP HEADER BAR ---
+        header_frame = tk.Frame(self.root, bg="#ffffff", height=80)
+        header_frame.pack(side=tk.TOP, fill=tk.X)
+        header_frame.pack_propagate(False)
+
+        # Subtle bottom border separator line
+        border_line = tk.Frame(self.root, bg="#cbd5e1", height=1)
+        border_line.pack(side=tk.TOP, fill=tk.X)
+
+        # Logo on the left of header
+        if self.logo_img:
+            logo_lbl = tk.Label(header_frame, image=self.logo_img, bg="#ffffff")
+            logo_lbl.pack(side=tk.LEFT, padx=20, pady=13)
+        else:
+            logo_lbl = tk.Label(header_frame, text="ARK TECHNOLOGY", font=("Avenir Next", 14, "bold"), bg="#ffffff", fg=ACCENT)
+            logo_lbl.pack(side=tk.LEFT, padx=20, pady=25)
+
+        # Title/desc in the center
+        title_lbl = tk.Label(header_frame, text="ARK FLASHER", font=("Avenir Next", 18, "bold"), bg="#ffffff", fg=FG_MAIN)
+        title_lbl.pack(side=tk.LEFT, padx=(10, 15), pady=23)
+
+        # Live Status indicator on the right of header
+        status_subframe = tk.Frame(header_frame, bg="#ffffff")
+        status_subframe.pack(side=tk.RIGHT, padx=25, pady=23)
+
+        self.status_dot = tk.Label(status_subframe, text="●", font=("Avenir Next", 14), bg="#ffffff", fg=ACCENT_RED)
+        self.status_dot.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.status_text_lbl = tk.Label(status_subframe, text="DISCONNECTED", font=self.font_sans_bold, bg="#ffffff", fg=FG_MUTED)
+        self.status_text_lbl.pack(side=tk.LEFT)
+
+        # Main outer frame with padding (positioned below header)
         main_frame = tk.Frame(self.root, bg=BG_MAIN)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
@@ -165,10 +304,6 @@ class ArkFlasherGUI:
         left_frame = tk.Frame(main_frame, bg=BG_MAIN, width=390)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 15))
         left_frame.pack_propagate(False)
-
-        # Left Pane Title Header Banner
-        banner_lbl = tk.Label(left_frame, text="ARK FLASHER", font=("Helvetica Neue", 14, "bold"), bg=BG_MAIN, fg=ACCENT)
-        banner_lbl.pack(anchor=tk.W, pady=(0, 15))
 
         # Card 1: Project Source Input
         source_card = self.create_card(left_frame, "1. PROJECT WORKSPACE")
@@ -178,7 +313,7 @@ class ArkFlasherGUI:
 
         self.project_path_var = tk.StringVar()
         self.entry_dir = tk.Entry(source_card, textvariable=self.project_path_var, bg=BG_INPUT, fg=FG_MAIN, 
-                                  insertbackground=FG_MAIN, relief="flat", bd=1, highlightbackground=BG_INPUT, 
+                                  insertbackground=FG_MAIN, relief="flat", bd=1, highlightbackground="#cbd5e1", 
                                   highlightcolor=ACCENT, highlightthickness=1, font=self.font_sans)
         self.entry_dir.pack(fill=tk.X, pady=(0, 10))
 
@@ -186,7 +321,7 @@ class ArkFlasherGUI:
         lbl_token.pack(anchor=tk.W, pady=(0, 5))
 
         self.entry_token = tk.Entry(source_card, textvariable=self.github_token_var, bg=BG_INPUT, fg=FG_MAIN, 
-                                    insertbackground=FG_MAIN, relief="flat", bd=1, highlightbackground=BG_INPUT, 
+                                    insertbackground=FG_MAIN, relief="flat", bd=1, highlightbackground="#cbd5e1", 
                                     highlightcolor=ACCENT, highlightthickness=1, font=self.font_sans, show="*")
         self.entry_token.pack(fill=tk.X, pady=(0, 10))
 
@@ -198,11 +333,13 @@ class ArkFlasherGUI:
                                     activebackground=ACCENT_HOVER, activeforeground=FG_BUTTON, relief="flat", bd=0, 
                                     padx=10, pady=4, cursor="hand2", command=self.browse_project_folder)
         self.btn_browse.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
+        self.add_hover_effect(self.btn_browse, ACCENT_HOVER, BG_BUTTON)
 
         self.btn_load_src = tk.Button(src_btn_frame, text="Load / Sync", font=self.font_sans_bold, bg=ACCENT_GREEN, fg=FG_BUTTON,
                                      activebackground="#c2f0c2", activeforeground=FG_BUTTON, relief="flat", bd=0, 
                                      padx=10, pady=4, cursor="hand2", command=self.load_source)
         self.btn_load_src.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
+        self.add_hover_effect(self.btn_load_src, "#c2f0c2", ACCENT_GREEN)
 
         # Card 2: GitHub Release Control (collapsible/reactive)
         self.git_card = self.create_card(left_frame, "2. GITHUB VERSION DESIGN")
@@ -218,70 +355,103 @@ class ArkFlasherGUI:
                                           bg=BG_BUTTON_DISABLED, fg=FG_BUTTON_DISABLED, state=tk.DISABLED, relief="flat", bd=0, 
                                           pady=5, command=self.start_github_download)
         self.btn_git_download.pack(fill=tk.X)
+        self.add_hover_effect(self.btn_git_download, ACCENT_HOVER, ACCENT)
 
-        # Card 3: Target Board & System COM
-        setup_card = self.create_card(left_frame, "3. HARDWARE CONFIGS")
-
-        lbl_board = tk.Label(setup_card, text="Target Board Config:", font=self.font_sans_bold, bg=BG_CARD, fg=FG_MAIN)
-        lbl_board.pack(anchor=tk.W, pady=(0, 5))
-
+        # Hidden Combobox for Test Cases Compatibility
         self.selected_board_var = tk.StringVar()
-        self.combo_board = ttk.Combobox(setup_card, textvariable=self.selected_board_var, state="disabled", font=self.font_sans)
-        self.combo_board.pack(fill=tk.X, pady=(0, 10))
+        self.combo_board = ttk.Combobox(left_frame, textvariable=self.selected_board_var)
         self.combo_board.bind("<<ComboboxSelected>>", self.on_board_selected)
+
+        # Card 3: Flasher Control
+        setup_card = self.create_card(left_frame, "3. FLASHER CONTROL")
 
         lbl_port = tk.Label(setup_card, text="Serial COM Port:", font=self.font_sans_bold, bg=BG_CARD, fg=FG_MAIN)
         lbl_port.pack(anchor=tk.W, pady=(0, 5))
 
         port_subframe = tk.Frame(setup_card, bg=BG_CARD)
-        port_subframe.pack(fill=tk.X)
+        port_subframe.pack(fill=tk.X, pady=(0, 10))
 
         self.selected_port_var = tk.StringVar()
         self.combo_port = ttk.Combobox(port_subframe, textvariable=self.selected_port_var, state="readonly", font=self.font_sans, width=15)
         self.combo_port.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.combo_port.bind("<<ComboboxSelected>>", lambda e: self.update_flash_button_state())
+        self.combo_port.bind("<<ComboboxSelected>>", lambda e: (self.update_flash_button_state(), self.update_hardware_status()))
 
         self.btn_refresh_ports = tk.Button(port_subframe, text="⟳", font=("Helvetica Neue", 12, "bold"), bg=BG_BUTTON, 
                                            fg=FG_BUTTON, activebackground=ACCENT_HOVER, activeforeground=FG_BUTTON, 
                                            relief="flat", bd=0, padx=6, pady=2, cursor="hand2", command=self.refresh_ports)
         self.btn_refresh_ports.pack(side=tk.LEFT, padx=(5, 0))
-
-        # Card 4: Action Flasher
-        action_card = self.create_card(left_frame, "4. PROGRAMMER FLASHER")
+        self.add_hover_effect(self.btn_refresh_ports, ACCENT_HOVER, BG_BUTTON)
 
         self.is_dry_run_var = tk.BooleanVar(value=True)
-        self.sim_check = ttk.Checkbutton(action_card, text="Simulate Flash (Dry Run / Test)", variable=self.is_dry_run_var, style="TCheckbutton")
+        self.sim_check = ttk.Checkbutton(setup_card, text="Simulate Flash (Dry Run / Test)", variable=self.is_dry_run_var, style="TCheckbutton")
         self.sim_check.pack(anchor=tk.W, pady=(0, 10))
 
-        self.btn_flash = tk.Button(action_card, text="Flash Target Board", font=("Helvetica Neue", 12, "bold"), 
+        self.btn_flash = tk.Button(setup_card, text="Flash Target Board", font=("Helvetica Neue", 12, "bold"), 
                                    bg=BG_BUTTON_DISABLED, fg=FG_BUTTON_DISABLED, relief="flat", bd=0, 
                                    pady=8, state=tk.DISABLED, command=self.start_flash)
         self.btn_flash.pack(fill=tk.X)
 
-        # --- RIGHT COLUMN (Details & Live Logs Console) ---
+        def on_enter_flash(e):
+            if self.btn_flash.cget("state") != "disabled":
+                is_dry = self.is_dry_run_var.get()
+                self.btn_flash.configure(bg="#fce8c3" if is_dry else "#c2f0c2")
+        def on_leave_flash(e):
+            if self.btn_flash.cget("state") != "disabled":
+                is_dry = self.is_dry_run_var.get()
+                self.btn_flash.configure(bg=ACCENT_YELLOW if is_dry else ACCENT_GREEN)
+        self.btn_flash.bind("<Enter>", on_enter_flash)
+        self.btn_flash.bind("<Leave>", on_leave_flash)
+
+        # --- RIGHT COLUMN (Board Catalog & Project Specs Dashboard) ---
         right_frame = tk.Frame(main_frame, bg=BG_MAIN)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Panel 1: Documentation Panel
-        lbl_desc_title = tk.Label(right_frame, text="PROJECT RE.ME DOCUMENTATION", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
+        # 1. Board Catalog Section
+        lbl_catalog_title = tk.Label(right_frame, text="BOARD CATALOG BROWSER", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
+        lbl_catalog_title.pack(anchor=tk.W, pady=(0, 5))
+
+        catalog_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
+        catalog_card.pack(fill=tk.X, pady=(0, 15))
+
+        # A horizontal frame for catalog boards
+        self.catalog_grid_frame = tk.Frame(catalog_card, bg=BG_CARD, padx=10, pady=10)
+        self.catalog_grid_frame.pack(fill=tk.X)
+        self.board_card_widgets = []
+
+        no_boards_lbl = tk.Label(self.catalog_grid_frame, text="No board configurations discovered yet. Load a project first.", 
+                                 font=self.font_sans, bg=BG_CARD, fg=FG_MUTED)
+        no_boards_lbl.pack(pady=40)
+
+        # 2. Bottom split frame for side-by-side docs and console logs
+        bottom_split_frame = tk.Frame(right_frame, bg=BG_MAIN)
+        bottom_split_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Left split: README panel
+        docs_wrapper = tk.Frame(bottom_split_frame, bg=BG_MAIN)
+        docs_wrapper.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+
+        lbl_desc_title = tk.Label(docs_wrapper, text="PROJECT README DOCUMENTATION", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
         lbl_desc_title.pack(anchor=tk.W, pady=(0, 5))
 
-        desc_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
-        desc_card.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        desc_card = tk.Frame(docs_wrapper, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
+        desc_card.pack(fill=tk.BOTH, expand=True)
 
         self.desc_text = scrolledtext.ScrolledText(desc_card, wrap=tk.WORD, font=self.font_sans, bg=BG_CARD, fg=FG_MAIN,
-                                                   insertbackground=FG_MAIN, relief="flat", bd=0, state=tk.DISABLED, height=12)
+                                                   insertbackground=FG_MAIN, relief="flat", bd=0, state=tk.DISABLED)
         self.desc_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Panel 2: Live Log Console
-        lbl_logs_title = tk.Label(right_frame, text="LIVE CONSOLE OUTPUT", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
+        # Right split: Console Logs panel
+        logs_wrapper = tk.Frame(bottom_split_frame, bg=BG_MAIN)
+        logs_wrapper.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        lbl_logs_title = tk.Label(logs_wrapper, text="LIVE CONSOLE OUTPUT", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
         lbl_logs_title.pack(anchor=tk.W, pady=(0, 5))
 
-        logs_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
+        logs_card = tk.Frame(logs_wrapper, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
         logs_card.pack(fill=tk.BOTH, expand=True)
 
         self.log_text = scrolledtext.ScrolledText(logs_card, wrap=tk.CHAR, font=self.font_mono, bg="#0d0e15", fg="#d9e0ee",
-                                                  insertbackground="#d9e0ee", relief="flat", bd=0, state=tk.DISABLED, height=18)
+                                                   insertbackground="#d9e0ee", relief="flat", bd=0, state=tk.DISABLED)
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Colors configuration for terminal styling tags
@@ -295,10 +465,10 @@ class ArkFlasherGUI:
 
     def create_card(self, parent, title):
         card = tk.Frame(parent, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT, highlightthickness=0)
-        card.pack(fill=tk.X, pady=(0, 12))
+        card.pack(fill=tk.X, pady=(0, 10))
         
         # Border pad container
-        pcard = tk.Frame(card, bg=BG_CARD, padx=12, pady=12)
+        pcard = tk.Frame(card, bg=BG_CARD, padx=10, pady=10)
         pcard.pack(fill=tk.X)
         
         tlbl = tk.Label(pcard, text=title, font=self.font_title, bg=BG_CARD, fg=ACCENT)
@@ -360,6 +530,7 @@ class ArkFlasherGUI:
             self.log(f"COM Ports Refreshed. Found {len(port_list)} ports.", "info")
 
         self.update_flash_button_state()
+        self.update_hardware_status()
 
     def parse_github_url(self, value):
         match = re.search(r'github\.com/([^/]+)/([^/.]+)', value)
@@ -510,11 +681,13 @@ class ArkFlasherGUI:
         if os.path.exists(build_path) and os.path.isdir(build_path):
             subdirs = [d for d in os.listdir(build_path) if os.path.isdir(os.path.join(build_path, d))]
             if subdirs:
+                sorted_subdirs = sorted(subdirs)
                 self.combo_board.configure(state="readonly")
-                self.combo_board['values'] = sorted(subdirs)
-                self.combo_board.set(subdirs[0])
+                self.combo_board['values'] = sorted_subdirs
+                self.combo_board.set(sorted_subdirs[0])
                 self.log(f"Loaded {len(subdirs)} target boards from Build/ folder.", "success")
-                self.on_board_selected()
+                self.render_board_catalog(sorted_subdirs)
+                self.select_board_card(sorted_subdirs[0])
             else:
                 self.combo_board.configure(state="disabled")
                 self.combo_board['values'] = []
@@ -522,6 +695,7 @@ class ArkFlasherGUI:
                 self.log("Warning: Build/ folder contains no subdirectories.", "warning")
                 self.parsed_binaries = []
                 self.set_flash_btn_active(False)
+                self.render_board_catalog([])
         else:
             self.combo_board.configure(state="disabled")
             self.combo_board['values'] = []
@@ -529,6 +703,7 @@ class ArkFlasherGUI:
             self.log("Error: 'Build' folder (case-sensitive) not found in project root folder.", "error")
             self.parsed_binaries = []
             self.set_flash_btn_active(False)
+            self.render_board_catalog([])
 
         self.update_flash_button_state()
 
