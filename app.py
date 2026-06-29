@@ -186,6 +186,19 @@ class ArkFlasherGUI:
         widget.bind("<Enter>", on_enter)
         widget.bind("<Leave>", on_leave)
 
+    def bind_mousewheel(self, widget):
+        def on_mousewheel(event):
+            if sys.platform == 'darwin':
+                self.catalog_canvas.xview_scroll(-1 * event.delta, "units")
+            else:
+                self.catalog_canvas.xview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        widget.bind("<MouseWheel>", on_mousewheel)
+        widget.bind("<Button-4>", lambda e: self.catalog_canvas.xview_scroll(-1, "units"))
+        widget.bind("<Button-5>", lambda e: self.catalog_canvas.xview_scroll(1, "units"))
+        for child in widget.winfo_children():
+            self.bind_mousewheel(child)
+
     def update_hardware_status(self):
         selected_port = self.selected_port_var.get()
         if selected_port and selected_port != "No COM ports detected":
@@ -200,11 +213,16 @@ class ArkFlasherGUI:
         for widget in self.catalog_grid_frame.winfo_children():
             widget.destroy()
         self.board_card_widgets = []
+        
+        # Reset scroll view to start
+        if hasattr(self, 'catalog_canvas'):
+            self.catalog_canvas.xview_moveto(0)
 
         if not boards:
             no_boards_lbl = tk.Label(self.catalog_grid_frame, text="No board configurations discovered yet. Load a project first.", 
                                      font=self.font_sans, bg=BG_CARD, fg=FG_MUTED)
             no_boards_lbl.pack(pady=40)
+            self.bind_mousewheel(self.catalog_grid_frame)
             return
 
         # Render board cards
@@ -250,6 +268,8 @@ class ArkFlasherGUI:
             card_frame.bind("<Leave>", make_hover_leave())
 
             self.board_card_widgets.append(card_frame)
+
+        self.bind_mousewheel(self.catalog_grid_frame)
 
     def select_board_card(self, board_name):
         self.selected_board_var.set(board_name)
@@ -418,14 +438,31 @@ class ArkFlasherGUI:
         catalog_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground="#e2e8f0")
         catalog_card.pack(fill=tk.X, pady=(0, 10))
 
+        # A Canvas to scroll the cards
+        self.catalog_canvas = tk.Canvas(catalog_card, bg=BG_CARD, highlightthickness=0, bd=0)
+        self.catalog_canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Horizontal Scrollbar
+        self.catalog_scrollbar = ttk.Scrollbar(catalog_card, orient=tk.HORIZONTAL, command=self.catalog_canvas.xview)
+        self.catalog_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.catalog_canvas.configure(xscrollcommand=self.catalog_scrollbar.set)
+
         # A horizontal frame for catalog boards
-        self.catalog_grid_frame = tk.Frame(catalog_card, bg=BG_CARD, padx=10, pady=8)
-        self.catalog_grid_frame.pack(fill=tk.X)
+        self.catalog_grid_frame = tk.Frame(self.catalog_canvas, bg=BG_CARD, padx=10, pady=8)
+        self.catalog_window_id = self.catalog_canvas.create_window((0, 0), window=self.catalog_grid_frame, anchor="nw")
         self.board_card_widgets = []
 
         no_boards_lbl = tk.Label(self.catalog_grid_frame, text="No board configurations discovered yet. Load a project first.", 
                                  font=self.font_sans, bg=BG_CARD, fg=FG_MUTED)
         no_boards_lbl.pack(pady=25)
+
+        # Dynamically resize canvas height to match grid frame and update scrollregion
+        def on_grid_configure(event):
+            self.catalog_canvas.configure(scrollregion=self.catalog_canvas.bbox("all"))
+            grid_height = self.catalog_grid_frame.winfo_reqheight()
+            self.catalog_canvas.configure(height=grid_height)
+
+        self.catalog_grid_frame.bind("<Configure>", on_grid_configure)
 
         # 2. README Documentation Panel (stacked in middle)
         lbl_desc_title = tk.Label(right_frame, text="PROJECT README DOCUMENTATION", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)

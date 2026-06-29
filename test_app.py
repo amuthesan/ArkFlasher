@@ -31,7 +31,7 @@ class TestArkFlasherGUI(unittest.TestCase):
         # Withdraw the root window so it doesn't display physically during tests
         self.root.withdraw()
         self.gui = app.ArkFlasherGUI(self.root)
-        self.mock_project_dir = "/Users/amuthesan/.gemini/antigravity/scratch/esp_gui_wrapper/mock_project"
+        self.mock_project_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "project_template")
 
     def tearDown(self):
         self.root.destroy()
@@ -47,7 +47,7 @@ class TestArkFlasherGUI(unittest.TestCase):
         self.assertEqual(matches[0], ("0x1000", "bootloader.bin"))
         self.assertEqual(matches[1], ("0x8000", "partition-table.bin"))
         self.assertEqual(matches[2], ("0x10000", "firmware.bin"))
-
+ 
     def test_parse_github_url(self):
         # Valid URLs
         owner, repo = self.gui.parse_github_url("https://github.com/espressif/esptool")
@@ -59,7 +59,7 @@ class TestArkFlasherGUI(unittest.TestCase):
         self.assertEqual(repo, "esptool")
 
         # Invalid URLs
-        owner, repo = self.gui.parse_github_url("/Users/amuthesan/project")
+        owner, repo = self.gui.parse_github_url("/unknown/path/project")
         self.assertIsNone(owner)
         self.assertIsNone(repo)
 
@@ -239,6 +239,14 @@ class TestArkFlasherGUI(unittest.TestCase):
             req = args[0]
             
             self.assertEqual(req.get_header("Authorization"), "Bearer ghp_download_secret_token")
+
+    def test_scrollable_catalog_components(self):
+        from tkinter import ttk
+        # Verify the canvas and scrollbar objects exist
+        self.assertTrue(hasattr(self.gui, 'catalog_canvas'))
+        self.assertTrue(hasattr(self.gui, 'catalog_scrollbar'))
+        self.assertIsInstance(self.gui.catalog_canvas, tk.Canvas)
+        self.assertIsInstance(self.gui.catalog_scrollbar, ttk.Scrollbar)
 
 if __name__ == "__main__":
     unittest.main()
