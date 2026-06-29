@@ -1,0 +1,22 @@
+# Python cache files
+__pycache__/
+*.pyc
+
+# IDE settings
+.vscode/
+.idea/
+.DS_Store
+
+# Program temporary downloads/caches
+github_downloads/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Sensitive secret files (to avoid committing private keys)
+*.key
+*.pem
+.env
+*token*
