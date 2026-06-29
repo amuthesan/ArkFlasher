@@ -129,6 +129,11 @@ class ArkFlasherGUI:
         # Create Layout
         self.build_ui()
 
+        # Prepopulate project workspace directory with current working directory to show panels populated on startup
+        curr_dir = os.path.abspath(os.path.dirname(__file__))
+        self.project_path_var.set(curr_dir)
+        self.root.after(100, lambda: self.load_local_directory(curr_dir))
+
         # Init COM port dropdown
         self.refresh_ports()
 
@@ -136,7 +141,7 @@ class ArkFlasherGUI:
         self.root.after(100, self.process_log_queue)
 
         self.log("Application started successfully.", "cyan")
-        self.log("Configure a local folder or paste a GitHub URL to start.", "muted")
+        self.log("Workspace auto-detected and loaded.", "success")
 
     def setup_styles(self):
         style = ttk.Style()
@@ -330,16 +335,16 @@ class ArkFlasherGUI:
         src_btn_frame.pack(fill=tk.X)
 
         self.btn_browse = tk.Button(src_btn_frame, text="Browse Folder...", font=self.font_sans_bold, bg=BG_BUTTON, fg=FG_BUTTON,
-                                    activebackground=ACCENT_HOVER, activeforeground=FG_BUTTON, relief="flat", bd=0, 
+                                    activebackground="#cbd5e1", activeforeground=FG_BUTTON, relief="flat", bd=0, 
                                     padx=10, pady=4, cursor="hand2", command=self.browse_project_folder)
         self.btn_browse.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
-        self.add_hover_effect(self.btn_browse, ACCENT_HOVER, BG_BUTTON)
+        self.add_hover_effect(self.btn_browse, "#cbd5e1", BG_BUTTON)
 
-        self.btn_load_src = tk.Button(src_btn_frame, text="Load / Sync", font=self.font_sans_bold, bg=ACCENT_GREEN, fg=FG_BUTTON,
-                                     activebackground="#c2f0c2", activeforeground=FG_BUTTON, relief="flat", bd=0, 
+        self.btn_load_src = tk.Button(src_btn_frame, text="Load / Sync", font=self.font_sans_bold, bg=ACCENT_GREEN, fg="#ffffff",
+                                     activebackground="#059669", activeforeground="#ffffff", relief="flat", bd=0, 
                                      padx=10, pady=4, cursor="hand2", command=self.load_source)
         self.btn_load_src.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
-        self.add_hover_effect(self.btn_load_src, "#c2f0c2", ACCENT_GREEN)
+        self.add_hover_effect(self.btn_load_src, "#059669", ACCENT_GREEN)
 
         # Card 2: GitHub Release Control (collapsible/reactive)
         self.git_card = self.create_card(left_frame, "2. GITHUB VERSION DESIGN")
@@ -377,10 +382,10 @@ class ArkFlasherGUI:
         self.combo_port.bind("<<ComboboxSelected>>", lambda e: (self.update_flash_button_state(), self.update_hardware_status()))
 
         self.btn_refresh_ports = tk.Button(port_subframe, text="⟳", font=("Helvetica Neue", 12, "bold"), bg=BG_BUTTON, 
-                                           fg=FG_BUTTON, activebackground=ACCENT_HOVER, activeforeground=FG_BUTTON, 
+                                           fg=FG_BUTTON, activebackground="#cbd5e1", activeforeground=FG_BUTTON, 
                                            relief="flat", bd=0, padx=6, pady=2, cursor="hand2", command=self.refresh_ports)
         self.btn_refresh_ports.pack(side=tk.LEFT, padx=(5, 0))
-        self.add_hover_effect(self.btn_refresh_ports, ACCENT_HOVER, BG_BUTTON)
+        self.add_hover_effect(self.btn_refresh_ports, "#cbd5e1", BG_BUTTON)
 
         self.is_dry_run_var = tk.BooleanVar(value=True)
         self.sim_check = ttk.Checkbutton(setup_card, text="Simulate Flash (Dry Run / Test)", variable=self.is_dry_run_var, style="TCheckbutton")
@@ -402,56 +407,46 @@ class ArkFlasherGUI:
         self.btn_flash.bind("<Enter>", on_enter_flash)
         self.btn_flash.bind("<Leave>", on_leave_flash)
 
-        # --- RIGHT COLUMN (Board Catalog & Project Specs Dashboard) ---
+        # --- RIGHT COLUMN (Board Catalog & Program Specs Widescreen) ---
         right_frame = tk.Frame(main_frame, bg=BG_MAIN)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # 1. Board Catalog Section
         lbl_catalog_title = tk.Label(right_frame, text="BOARD CATALOG BROWSER", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
-        lbl_catalog_title.pack(anchor=tk.W, pady=(0, 5))
+        lbl_catalog_title.pack(anchor=tk.W, pady=(0, 4))
 
-        catalog_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
-        catalog_card.pack(fill=tk.X, pady=(0, 15))
+        catalog_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground="#e2e8f0")
+        catalog_card.pack(fill=tk.X, pady=(0, 10))
 
         # A horizontal frame for catalog boards
-        self.catalog_grid_frame = tk.Frame(catalog_card, bg=BG_CARD, padx=10, pady=10)
+        self.catalog_grid_frame = tk.Frame(catalog_card, bg=BG_CARD, padx=10, pady=8)
         self.catalog_grid_frame.pack(fill=tk.X)
         self.board_card_widgets = []
 
         no_boards_lbl = tk.Label(self.catalog_grid_frame, text="No board configurations discovered yet. Load a project first.", 
                                  font=self.font_sans, bg=BG_CARD, fg=FG_MUTED)
-        no_boards_lbl.pack(pady=40)
+        no_boards_lbl.pack(pady=25)
 
-        # 2. Bottom split frame for side-by-side docs and console logs
-        bottom_split_frame = tk.Frame(right_frame, bg=BG_MAIN)
-        bottom_split_frame.pack(fill=tk.BOTH, expand=True)
+        # 2. README Documentation Panel (stacked in middle)
+        lbl_desc_title = tk.Label(right_frame, text="PROJECT README DOCUMENTATION", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
+        lbl_desc_title.pack(anchor=tk.W, pady=(0, 4))
 
-        # Left split: README panel
-        docs_wrapper = tk.Frame(bottom_split_frame, bg=BG_MAIN)
-        docs_wrapper.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
-
-        lbl_desc_title = tk.Label(docs_wrapper, text="PROJECT README DOCUMENTATION", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
-        lbl_desc_title.pack(anchor=tk.W, pady=(0, 5))
-
-        desc_card = tk.Frame(docs_wrapper, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
-        desc_card.pack(fill=tk.BOTH, expand=True)
+        desc_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground="#e2e8f0")
+        desc_card.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         self.desc_text = scrolledtext.ScrolledText(desc_card, wrap=tk.WORD, font=self.font_sans, bg=BG_CARD, fg=FG_MAIN,
-                                                   insertbackground=FG_MAIN, relief="flat", bd=0, state=tk.DISABLED)
+                                                   insertbackground=FG_MAIN, relief="flat", bd=0, state=tk.DISABLED, height=8)
         self.desc_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Right split: Console Logs panel
-        logs_wrapper = tk.Frame(bottom_split_frame, bg=BG_MAIN)
-        logs_wrapper.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # 3. Live Console Logs (Tray at bottom, full width of details section)
+        lbl_logs_title = tk.Label(right_frame, text="LIVE CONSOLE OUTPUT", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
+        lbl_logs_title.pack(anchor=tk.W, pady=(0, 4))
 
-        lbl_logs_title = tk.Label(logs_wrapper, text="LIVE CONSOLE OUTPUT", font=self.font_title, bg=BG_MAIN, fg=FG_MUTED)
-        lbl_logs_title.pack(anchor=tk.W, pady=(0, 5))
-
-        logs_card = tk.Frame(logs_wrapper, bg=BG_CARD, bd=1, relief="solid", highlightbackground=BG_INPUT)
-        logs_card.pack(fill=tk.BOTH, expand=True)
+        logs_card = tk.Frame(right_frame, bg=BG_CARD, bd=1, relief="solid", highlightbackground="#e2e8f0")
+        logs_card.pack(fill=tk.X, pady=(0, 2))
 
         self.log_text = scrolledtext.ScrolledText(logs_card, wrap=tk.CHAR, font=self.font_mono, bg="#0d0e15", fg="#d9e0ee",
-                                                   insertbackground="#d9e0ee", relief="flat", bd=0, state=tk.DISABLED)
+                                                   insertbackground="#d9e0ee", relief="flat", bd=0, state=tk.DISABLED, height=8)
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Colors configuration for terminal styling tags
@@ -501,8 +496,9 @@ class ArkFlasherGUI:
 
     def set_flash_btn_active(self, active=True):
         if active:
-            self.btn_flash.configure(bg=ACCENT_GREEN if not self.is_dry_run_var.get() else ACCENT_YELLOW, 
-                                     fg=FG_BUTTON, state=tk.NORMAL, cursor="hand2")
+            is_dry = self.is_dry_run_var.get()
+            self.btn_flash.configure(bg=ACCENT_YELLOW if is_dry else ACCENT_GREEN, 
+                                     fg="#0f172a" if is_dry else "#ffffff", state=tk.NORMAL, cursor="hand2")
         else:
             self.btn_flash.configure(bg=BG_BUTTON_DISABLED, fg=FG_BUTTON_DISABLED, state=tk.DISABLED, cursor="")
 
@@ -597,7 +593,7 @@ class ArkFlasherGUI:
             self.combo_git_version.configure(state="readonly")
             self.combo_git_version['values'] = versions
             self.combo_git_version.set(versions[0])
-            self.btn_git_download.configure(bg=ACCENT, fg=FG_BUTTON, state=tk.NORMAL, cursor="hand2")
+            self.btn_git_download.configure(bg=ACCENT, fg="#ffffff", state=tk.NORMAL, cursor="hand2")
             self.lbl_git_versions.configure(fg=FG_MAIN)
         self.root.after(0, gui_update)
 
@@ -878,7 +874,7 @@ class ArkFlasherGUI:
             self.sim_check.configure(state="normal")
             self.btn_refresh_ports.configure(state=state)
             if self.combo_git_version["values"]:
-                self.btn_git_download.configure(bg=ACCENT, fg=FG_BUTTON, state=tk.NORMAL, cursor="hand2")
+                self.btn_git_download.configure(bg=ACCENT, fg="#ffffff", state=tk.NORMAL, cursor="hand2")
             self.update_flash_button_state()
 
     def flash_thread_worker(self, port, is_dry_run):
