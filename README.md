@@ -59,3 +59,15 @@ Ark Flasher supports loading your project files in two ways:
 
 1. **Local Mode**: Click **Browse Folder...** to point to the repository root directory on your computer.
 2. **GitHub Mode**: Paste the repository URL (e.g., `https://github.com/your-username/your-project`) in the **Path or GitHub Repo URL** field and click **Load / Sync**. If the project is private, provide a GitHub Personal Access Token in the **GitHub Token (Optional)** field.
+
+---
+
+## 🔌 ESP32-S3 Standalone Flasher Host (v1.0)
+
+Ark Flasher now includes embedded **ESP32-S3 Host Firmware** (located under `firmware/`). With this firmware, an ESP32-S3 can act as a standalone, wireless flasher host:
+- **Wi-Fi Access Point**: Emits `ArkFlasher_AP` (IP `192.168.4.1`) serving a web interface.
+- **USB OTG**: Connects directly to target ESP32 boards using D+/D- USB lines.
+- **Memory Efficient**: Streams flashing payloads from the browser directly to the target board without caching them in RAM or flash.
+
+For details on wiring, compilation, and flashing instructions, see [firmware/README.md](file:///Users/amuthesan/Documents/Antigravity/Ark%20Flasher/ArkFlasher/firmware/src/web_ui.h) (or check the built-in repository sources).
+

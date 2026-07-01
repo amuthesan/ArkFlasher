@@ -2,16 +2,14 @@
 
 All notable changes to ArkFlasher will be documented in this file.
 
-## [0.1.0]
-- Stacked right panes vertically for Board Catalog, README, and Terminal Console.
-- Auto-detect workspace and open with project data upon startup.
-
-## [0.1.1]
-- Selected board state highlights card frames dynamically.
-
-## [0.1.2]
-- Asynchronous GitHub release loading and fetching.
-- Direct zipball downloading and import overrides.
+## [1.0.0] - 2026-07-01
+### Added
+- Native ESP32-S3 Standalone Flasher Host firmware (`firmware/`).
+- USB Host CDC-ACM driver mapping and low-level `esp-serial-flasher` integration.
+- Responsive HTML5 Single Page Application (SPA) dashboard served from flash memory.
+- Wi-Fi Access Point (`ArkFlasher_AP` at `192.168.4.1`) and lightweight REST HTTP server.
+- Real-time event log stream console powered by Server-Sent Events (SSE).
+- Dynamic file segment addressing and chunked binary flashing.
 
 ## [0.1.3] - 2026-06-29
 ### Added
